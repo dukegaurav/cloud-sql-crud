@@ -58,7 +58,8 @@ def create_user(SessionLocal: sessionmaker, name: str, email: str):
         session = SessionLocal()
         existing = session.query(UserModel).filter_by(email=email).first()
         if existing:
-            return {"error": "User already exists."}
+            logger.info("User %s already exists", email)
+            return {"error": f"User {email} already exists."}
         user = UserModel(name=name, email=email)
         session.add(user)
         session.commit()
@@ -79,6 +80,7 @@ def read_users(SessionLocal: sessionmaker):
         users = session.query(UserModel).all()
         return [{"id": user.id, "name": user.name, "email": user.email} for user in users]
     except SQLAlchemyError as e:
+        logger.error("Error in read_users: %s", e)
         return {"error": str(e)}
     finally:
         session.close()
@@ -88,31 +90,35 @@ def update_user(SessionLocal:sessionmaker, id: int, new_name: str = None, new_em
     try:
         user = session.query(UserModel).filter_by(id=id).first()
         if not user:
-            logger.error
+            logger.error("User not found.")
             return {"error": "User not found."}
         if new_name:
             user.name = new_name
-        if new_department:
-            user.department = new_department
+        if new_email:
+            user.email = new_email
         session.commit()
-        return {"message": f"Employee {emp_id} updated."}
+        logger.info("User Updated.")
+        return {"message": f"user {id} updated."}
     except SQLAlchemyError as e:
         session.rollback()
+        logger.error("Error in update_user: %s", e)
         return {"error": str(e)}
     finally:
         session.close()
 
-def delete_employee(emp_id: int):
+def delete_user(SessionLocal:sessionmaker, id: int):
     session = SessionLocal()
     try:
-        emp = session.query(Employee).filter_by(id=emp_id).first()
+        emp = session.query(UserModel).filter_by(id=id).first()
         if not emp:
-            return {"error": "Employee not found."}
+            logger.error("User not found.")
+            return {"error": "User not found."}
         session.delete(emp)
         session.commit()
-        return {"message": f"Employee {emp_id} deleted."}
+        return {"message": f"User {id} deleted."}
     except SQLAlchemyError as e:
         session.rollback()
+        logger.error("Error in delete_user: %s", e)
         return {"error": str(e)}
     finally:
         session.close()
@@ -122,5 +128,7 @@ def delete_employee(emp_id: int):
 if __name__ == "__main__":
     engine, session = init_connection_pool()
     init_db(engine)
-    create_user(session, "gaurav", "test@abc.com")
-    print(create_user(session, "test2", "test2@abc.com"))
+    # create_user(session, "gaurav", "test@abc.com")
+    # print(create_user(session, "test2", "test2@abc.com"))
+    # print(update_user(session, id=1,new_name="test1"))
+    print(read_users(session))
