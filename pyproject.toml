@@ -1,0 +1,18 @@
+[project]
+name = "sql"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "asyncpg>=0.30.0",
+    "black>=25.11.0",
+    "cloud-sql-python-connector>=1.18.5",
+    "flask>=3.1.2",
+    "gunicorn>=23.0.0",
+    "isort>=7.0.0",
+    "pg8000>=1.31.5",
+    "python-dotenv>=1.2.1",
+    "quart>=0.20.0",
+    "sqlalchemy>=2.0.44",
+]
