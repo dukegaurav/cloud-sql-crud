@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
     # Run the Flask app
     try:
-        app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
+        app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
     except Exception as err:
         # pylint: disable=broad-except
         logger.error("Application failed to run: %s", err)

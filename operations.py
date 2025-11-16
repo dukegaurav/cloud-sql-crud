@@ -1,6 +1,7 @@
 """Database operations (CRUD) for the UserModel using SQLAlchemy."""
 
 import os
+from contextlib import contextmanager # ADDED: For cleaner session management
 from typing import Any, Optional, Tuple
 
 import sqlalchemy
@@ -27,11 +28,9 @@ def init_connection_pool() -> ConnectionPoolTuple:
     Sets up connection pool for the app.
     Returns: (Engine, SessionMaker, Connector | None)
     """
-    # use a TCP socket when DB_HOST (e.g. 127.0.0.1) is defined
     if os.getenv("DB_HOST"):
         return connect_tcp_socket()
 
-    # use the connector when INSTANCE_CONNECTION_NAME (e.g. project:region:instance) is defined
     if os.getenv("INSTANCE_CONNECTION_NAME"):
         # Either a DB_USER or a DB_IAM_USER should be defined. If both are
         # defined, DB_IAM_USER takes precedence.
@@ -62,58 +61,75 @@ def init_db(engine: sqlalchemy.engine.base.Engine) -> bool:
         return False
 
 
-def create_user(SessionLocal: sessionmaker, name: str, email: str):
-    """Creates a user if not exists, given name and email."""
+@contextmanager
+def get_session(SessionLocal: sessionmaker, commit: bool = False):
+    """
+    Provides a database session.
+    If commit is True, commits on success and rolls back on exception.
+    Always closes the session on exit.
+    """
     session = SessionLocal()
     try:
-        # Check if user exists
-        existing = session.query(UserModel).filter_by(email=email).first()
-        if existing:
-            logger.info("User %s already exists", email)
-            return {"error": f"User {email} already exists."}
-        user = UserModel(name=name, email=email)
-        session.add(user)
-        session.commit()
-        logger.info("User %s created.", email)
-        return {"message": f"User {name} added."}
-    except SQLAlchemyError as err:
-        session.rollback()
-        logger.error("Error in create_user: %s", err)
-        return {"error": str(err)}
+        yield session
+        if commit:
+            session.commit()
+    except SQLAlchemyError:
+        # Rollback only if a commit was expected and an error occurred
+        if commit:
+            session.rollback()
+        raise
     finally:
         session.close()
-        logger.info("Session Closed")
+
+
+def create_user(SessionLocal: sessionmaker, name: str, email: str):
+    """Creates a user if not exists, given name and email."""
+    try:
+        # Use context manager with commit=True for write operation
+        with get_session(SessionLocal, commit=True) as session:
+            # Check if user exists (to provide clean "already exists" error for Flask route)
+            existing = session.query(UserModel).filter_by(email=email).first()
+            if existing:
+                logger.info("User %s already exists", email)
+                return {"error": f"User {email} already exists."}
+
+            user = UserModel(name=name, email=email)
+            session.add(user)
+            logger.info("User %s created.", email)
+            return {"message": f"User {name} added."}
+    except SQLAlchemyError as err:
+        # Catches exceptions raised and re-raised by get_session (after rollback)
+        logger.error("Error in create_user: %s", err)
+        return {"error": str(err)}
 
 
 def read_users(SessionLocal: sessionmaker):
     """Reads all users from the database."""
-    session = SessionLocal()
     try:
-        users = session.query(UserModel).all()
-        return [
-            {"id": user.id, "name": user.name, "email": user.email} for user in users
-        ]
+        # Use context manager without commit for read operation
+        with get_session(SessionLocal) as session:
+            users = session.query(UserModel).all()
+            return [
+                {"id": user.id, "name": user.name, "email": user.email} for user in users
+            ]
     except SQLAlchemyError as err:
         logger.error("Error in read_users: %s", err)
         return {"error": str(err)}
-    finally:
-        session.close()
 
 
 def read_user(SessionLocal: sessionmaker, user_id: int):
     """Reads a single user by their ID."""
-    session = SessionLocal()
     try:
-        user = session.query(UserModel).filter_by(id=user_id).first()
-        if user:
-            return {"id": user.id, "name": user.name, "email": user.email}
-        logger.error("User ID %d not found.", user_id)
-        return {"error": "User not found."}
+        with get_session(SessionLocal) as session:
+            user = session.query(UserModel).filter_by(id=user_id).first()
+            if user:
+                return {"id": user.id, "name": user.name, "email": user.email}
+
+            logger.error("User ID %d not found.", user_id)
+            return {"error": "User not found."}
     except SQLAlchemyError as err:
         logger.error("Error in read_user: %s", err)
         return {"error": str(err)}
-    finally:
-        session.close()
 
 
 def update_user(
@@ -123,54 +139,42 @@ def update_user(
     new_email: str = None,
 ):
     """Updates a user's name or email by their ID."""
-    session = SessionLocal()
     try:
-        user = session.query(UserModel).filter_by(id=id_to_update).first()
-        if not user:
-            logger.error("User not found.")
-            return {"error": "User not found."}
-        if new_name:
-            user.name = new_name
-        if new_email:
-            user.email = new_email
-        session.commit()
-        logger.info("User Updated.")
-        return {"message": f"user {id_to_update} updated."}
+        # Use context manager with commit=True for write operation
+        with get_session(SessionLocal, commit=True) as session:
+            user = session.query(UserModel).filter_by(id=id_to_update).first()
+            if not user:
+                logger.error("User not found.")
+                return {"error": "User not found."}
+
+            if new_name:
+                user.name = new_name
+            if new_email:
+                user.email = new_email
+
+            logger.info("User Updated.")
+            return {"message": f"user {id_to_update} updated."}
     except SQLAlchemyError as err:
-        session.rollback()
         logger.error("Error in update_user: %s", err)
         return {"error": str(err)}
-    finally:
-        session.close()
 
 
 def delete_user(SessionLocal: sessionmaker, id_to_delete: int):
     """Deletes a user by their ID."""
-    session = SessionLocal()
     try:
-        emp = session.query(UserModel).filter_by(id=id_to_delete).first()
-        if not emp:
-            logger.error("User not found.")
-            return {"error": "User not found."}
-        session.delete(emp)
-        session.commit()
-        return {"message": f"User {id_to_delete} deleted."}
+        # Use context manager with commit=True for write operation
+        with get_session(SessionLocal, commit=True) as session:
+            emp = session.query(UserModel).filter_by(id=id_to_delete).first()
+            if not emp:
+                logger.error("User not found.")
+                return {"error": "User not found."}
+
+            session.delete(emp)
+            return {"message": f"User {id_to_delete} deleted."}
     except SQLAlchemyError as err:
-        session.rollback()
         logger.error("Error in delete_user: %s", err)
         return {"error": str(err)}
-    finally:
-        session.close()
 
 
 # if __name__ == "__main__":
-#     engine, session, connector = init_connection_pool()
-#     try:
-#         init_db(engine)
-#         print(create_user(session, "test", "test@abc.com"))
-#         print(update_user(session, id=1,new_name="test1"))
-#         print(read_users(session))
-#     finally:
-#         if connector:
-#             connector.close()
-#             logger.info("Cloud SQL Connector closed.")
+#     # ... (testing block remains the same)
