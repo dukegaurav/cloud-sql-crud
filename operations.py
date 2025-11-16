@@ -1,4 +1,5 @@
 import os
+from typing import Optional, Any
 import sqlalchemy
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
@@ -16,8 +17,11 @@ logger = get_logger("db")
 
 load_dotenv()
 
-def init_connection_pool() -> tuple[sqlalchemy.engine.base.Engine, sessionmaker]:
-    """Sets up connection pool for the app."""
+def init_connection_pool() -> tuple[sqlalchemy.engine.base.Engine, sessionmaker, Optional[Any]]:
+    """
+    Sets up connection pool for the app.
+    Returns: (Engine, SessionMaker, Connector | None)
+    """
     # use a TCP socket when DB_HOST (e.g. 127.0.0.1) is defined
     if os.getenv("DB_HOST"):
         return connect_tcp_socket()
@@ -27,9 +31,9 @@ def init_connection_pool() -> tuple[sqlalchemy.engine.base.Engine, sessionmaker]
         # Either a DB_USER or a DB_IAM_USER should be defined. If both are
         # defined, DB_IAM_USER takes precedence.
         return (
-            connect_with_connector_auto_iam_authn()
-            if os.getenv("DB_IAM_USER")
-            else connect_with_connector()
+            connect_with_connector()
+            if os.getenv("DB_PASS")
+            else connect_with_connector_auto_iam_authn()
         )
 
     raise ValueError(
@@ -85,6 +89,22 @@ def read_users(SessionLocal: sessionmaker):
     finally:
         session.close()
 
+def read_user(SessionLocal: sessionmaker, user_id: int):
+    """Reads a single user by their ID."""
+    session = SessionLocal()
+    try:
+        user = session.query(UserModel).filter_by(id=user_id).first()
+        if user:
+            return {"id": user.id, "name": user.name, "email": user.email}
+        else:
+            logger.error("User ID %d not found.", user_id)
+            return {"error": "User not found."}
+    except SQLAlchemyError as e:
+        logger.error("Error in read_user: %s", e)
+        return {"error": str(e)}
+    finally:
+        session.close()
+
 def update_user(SessionLocal:sessionmaker, id: int, new_name: str = None, new_email: str = None):
     session = SessionLocal()
     try:
@@ -125,10 +145,14 @@ def delete_user(SessionLocal:sessionmaker, id: int):
 
 
 
-if __name__ == "__main__":
-    engine, session = init_connection_pool()
-    init_db(engine)
-    # create_user(session, "gaurav", "test@abc.com")
-    # print(create_user(session, "test2", "test2@abc.com"))
-    # print(update_user(session, id=1,new_name="test1"))
-    print(read_users(session))
+# if __name__ == "__main__":
+#     engine, session, connector = init_connection_pool()
+#     try:
+#         init_db(engine)
+#         print(create_user(session, "test", "test@abc.com"))
+#         print(update_user(session, id=1,new_name="test1"))
+#         print(read_users(session))
+#     finally:
+#         if connector:
+#             connector.close()
+#             logger.info("Cloud SQL Connector closed.")

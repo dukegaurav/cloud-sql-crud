@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from google.cloud.sql.connector import Connector, IPTypes
 
 
-def connect_with_connector() -> tuple[sqlalchemy.engine.base.Engine, sessionmaker]:
+def connect_with_connector() -> tuple[sqlalchemy.engine.base.Engine, sessionmaker, Connector]:
     """
     Initializes a connection pool for a Cloud SQL instance of Postgres.
 
@@ -53,5 +53,7 @@ def connect_with_connector() -> tuple[sqlalchemy.engine.base.Engine, sessionmake
         # Connections that live longer than the specified amount of time will be
         # re-established
         pool_recycle=1800,  # 30 minutes
+        echo = False,
+        future = True
     )
-    return engine, sessionmaker(bind=engine)
+    return engine, sessionmaker(bind=engine), connector

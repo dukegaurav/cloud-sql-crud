@@ -3,19 +3,18 @@ import os
 import pg8000
 import sqlalchemy
 from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngine
 from sqlalchemy.orm import sessionmaker
 from google.cloud.sql.connector import Connector, IPTypes
 
 
-def connect_with_connector_auto_iam_authn() -> tuple[sqlalchemy.engine.base.Engine,sessionmaker]:
+def connect_with_connector_auto_iam_authn() -> tuple[sqlalchemy.engine.base.Engine,sessionmaker, Connector]:
     """
     Initializes a connection pool for a Cloud SQL instance of Postgres.
 
     Uses the Cloud SQL Python Connector with Automatic IAM Database Authentication.
     """
     instance_connection_name = os.getenv("INSTANCE_CONNECTION_NAME")
-    db_iam_user = os.getenv("DB_IAM_USER")
+    db_iam_user = os.getenv("DB_USER")
     db_name = os.getenv("DB_NAME")  # e.g. 'my-database'
 
     ip_type = IPTypes.PRIVATE
@@ -53,7 +52,7 @@ def connect_with_connector_auto_iam_authn() -> tuple[sqlalchemy.engine.base.Engi
         # Connections that live longer than the specified amount of time will be
         # re-established
         pool_recycle=1800,  # 30 minutes
-        echo = True,
+        echo = False,
         future = True
     )
-    return engine, sessionmaker(bind=engine)
+    return engine, sessionmaker(bind=engine), connector
