@@ -1,19 +1,14 @@
-from sqlalchemy import (
-    Column,
-    DateTime,
-    Index,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
-    func,
-)
+"""SQLAlchemy models for the Cloud SQL CRUD application."""
+
+from sqlalchemy import Column, DateTime, Integer, String, func
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
 
 class UserModel(Base):
+    """A model representing a user in the database."""
+
     __tablename__ = "users-4"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(32), nullable=False)

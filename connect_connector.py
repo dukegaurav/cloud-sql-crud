@@ -1,3 +1,5 @@
+"""Connection logic for connecting to Cloud SQL using the Cloud SQL Python Connector (password authentication)."""
+
 import os
 
 import pg8000
@@ -11,13 +13,14 @@ def connect_with_connector() -> (
     tuple[sqlalchemy.engine.base.Engine, sessionmaker, Connector]
 ):
     """
-    Initializes a connection pool for a Cloud SQL instance of Postgres.
+    Initializes a connection pool for a Cloud SQL instance of Postgres using the Connector.
 
-    Uses the Cloud SQL Python Connector package.
+    Returns:
+        A tuple containing the SQLAlchemy Engine, SessionMaker, and the Connector object.
     """
     instance_connection_name = os.getenv("INSTANCE_CONNECTION_NAME")
     db_user = os.getenv("DB_USER")  # e.g. 'my-db-user'
-    db_p = os.getenv("DB_PASS")  # e.g. 'my-db-password'
+    db_pass = os.getenv("DB_PASS")  # e.g. 'my-db-password' # Renamed db_p
     db_name = os.getenv("DB_NAME")  # e.g. 'my-database'
 
     ip_type = IPTypes.PRIVATE
@@ -26,11 +29,12 @@ def connect_with_connector() -> (
     connector = Connector(refresh_strategy="LAZY")
 
     def getconn() -> pg8000.dbapi.Connection:
+        """Helper function to create a new pg8000 connection."""
         conn: pg8000.dbapi.Connection = connector.connect(
             instance_connection_name,
             "pg8000",
             user=db_user,
-            password=db_p,
+            password=db_pass,
             db=db_name,
             ip_type=ip_type,
         )
@@ -45,8 +49,6 @@ def connect_with_connector() -> (
         pool_size=5,
         # Temporarily exceeds the set pool_size if no connections are available.
         max_overflow=2,
-        # The total number of concurrent connections for your application will be
-        # a total of pool_size and max_overflow.
         # 'pool_timeout' is the maximum number of seconds to wait when retrieving a
         # new connection from the pool. After the specified amount of time, an
         # exception will be thrown.

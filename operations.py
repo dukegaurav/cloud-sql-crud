@@ -1,5 +1,7 @@
+"""Database operations (CRUD) for the UserModel using SQLAlchemy."""
+
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import sqlalchemy
 from dotenv import load_dotenv
@@ -17,10 +19,10 @@ logger = get_logger("db")
 
 load_dotenv()
 
+ConnectionPoolTuple = Tuple[sqlalchemy.engine.base.Engine, sessionmaker, Optional[Any]]
 
-def init_connection_pool() -> (
-    tuple[sqlalchemy.engine.base.Engine, sessionmaker, Optional[Any]]
-):
+
+def init_connection_pool() -> ConnectionPoolTuple:
     """
     Sets up connection pool for the app.
     Returns: (Engine, SessionMaker, Connector | None)
@@ -44,8 +46,8 @@ def init_connection_pool() -> (
     )
 
 
-def init_db(engine) -> bool:
-    """Test database connectivity before serving requests."""
+def init_db(engine: sqlalchemy.engine.base.Engine) -> bool:
+    """Test database connectivity before serving requests and create tables."""
     try:
         with engine.connect() as conn:
             # check connectivity
@@ -55,16 +57,16 @@ def init_db(engine) -> bool:
         print("database connection success.")
         logger.info("Database connection succeful and tables ensured.")
         return True
-    except OperationalError as e:
-        logger.error("Database connection failed: %s", e)
+    except OperationalError as err:
+        logger.error("Database connection failed: %s", err)
         return False
 
 
 def create_user(SessionLocal: sessionmaker, name: str, email: str):
-    """Creatd a user if not exists, given name and email."""
+    """Creates a user if not exists, given name and email."""
+    session = SessionLocal()
     try:
         # Check if user exists
-        session = SessionLocal()
         existing = session.query(UserModel).filter_by(email=email).first()
         if existing:
             logger.info("User %s already exists", email)
@@ -74,25 +76,26 @@ def create_user(SessionLocal: sessionmaker, name: str, email: str):
         session.commit()
         logger.info("User %s created.", email)
         return {"message": f"User {name} added."}
-    except SQLAlchemyError as e:
+    except SQLAlchemyError as err:
         session.rollback()
-        logger.error("Error in create_user: %s", e)
-        return {"error": str(e)}
+        logger.error("Error in create_user: %s", err)
+        return {"error": str(err)}
     finally:
         session.close()
         logger.info("Session Closed")
 
 
 def read_users(SessionLocal: sessionmaker):
+    """Reads all users from the database."""
     session = SessionLocal()
     try:
         users = session.query(UserModel).all()
         return [
             {"id": user.id, "name": user.name, "email": user.email} for user in users
         ]
-    except SQLAlchemyError as e:
-        logger.error("Error in read_users: %s", e)
-        return {"error": str(e)}
+    except SQLAlchemyError as err:
+        logger.error("Error in read_users: %s", err)
+        return {"error": str(err)}
     finally:
         session.close()
 
@@ -104,22 +107,25 @@ def read_user(SessionLocal: sessionmaker, user_id: int):
         user = session.query(UserModel).filter_by(id=user_id).first()
         if user:
             return {"id": user.id, "name": user.name, "email": user.email}
-        else:
-            logger.error("User ID %d not found.", user_id)
-            return {"error": "User not found."}
-    except SQLAlchemyError as e:
-        logger.error("Error in read_user: %s", e)
-        return {"error": str(e)}
+        logger.error("User ID %d not found.", user_id)
+        return {"error": "User not found."}
+    except SQLAlchemyError as err:
+        logger.error("Error in read_user: %s", err)
+        return {"error": str(err)}
     finally:
         session.close()
 
 
 def update_user(
-    SessionLocal: sessionmaker, id: int, new_name: str = None, new_email: str = None
+    SessionLocal: sessionmaker,
+    id_to_update: int,
+    new_name: str = None,
+    new_email: str = None,
 ):
+    """Updates a user's name or email by their ID."""
     session = SessionLocal()
     try:
-        user = session.query(UserModel).filter_by(id=id).first()
+        user = session.query(UserModel).filter_by(id=id_to_update).first()
         if not user:
             logger.error("User not found.")
             return {"error": "User not found."}
@@ -129,29 +135,30 @@ def update_user(
             user.email = new_email
         session.commit()
         logger.info("User Updated.")
-        return {"message": f"user {id} updated."}
-    except SQLAlchemyError as e:
+        return {"message": f"user {id_to_update} updated."}
+    except SQLAlchemyError as err:
         session.rollback()
-        logger.error("Error in update_user: %s", e)
-        return {"error": str(e)}
+        logger.error("Error in update_user: %s", err)
+        return {"error": str(err)}
     finally:
         session.close()
 
 
-def delete_user(SessionLocal: sessionmaker, id: int):
+def delete_user(SessionLocal: sessionmaker, id_to_delete: int):
+    """Deletes a user by their ID."""
     session = SessionLocal()
     try:
-        emp = session.query(UserModel).filter_by(id=id).first()
+        emp = session.query(UserModel).filter_by(id=id_to_delete).first()
         if not emp:
             logger.error("User not found.")
             return {"error": "User not found."}
         session.delete(emp)
         session.commit()
-        return {"message": f"User {id} deleted."}
-    except SQLAlchemyError as e:
+        return {"message": f"User {id_to_delete} deleted."}
+    except SQLAlchemyError as err:
         session.rollback()
-        logger.error("Error in delete_user: %s", e)
-        return {"error": str(e)}
+        logger.error("Error in delete_user: %s", err)
+        return {"error": str(err)}
     finally:
         session.close()
 
