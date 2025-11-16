@@ -2,18 +2,17 @@ import os
 
 import sqlalchemy
 from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 
-def connect_tcp_socket() -> tuple[sqlalchemy.engine.base.Engine,sessionmaker, None]:
+def connect_tcp_socket() -> tuple[sqlalchemy.engine.base.Engine, sessionmaker, None]:
     """Initializes a TCP connection pool for a Cloud SQL instance of Postgres."""
     db_host = os.getenv("DB_HOST")  # e.g. '127.0.0.1'
     db_user = os.getenv("DB_USER")  # e.g. 'my-db-user'
     db_p = os.getenv("DB_PASS")  # e.g. 'my-db-password'
     db_name = os.getenv("DB_NAME", "postgres")  # e.g. 'my-database'
     db_port = os.getenv("DB_PORT", "5432")  # e.g. 5432
-
 
     engine = create_engine(
         sqlalchemy.engine.url.URL.create(

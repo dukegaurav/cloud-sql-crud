@@ -1,23 +1,26 @@
 import os
-from typing import Optional, Any
+from typing import Any, Optional
+
 import sqlalchemy
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError, OperationalError
-from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.orm import sessionmaker
 
 from connect_connector import connect_with_connector
 from connect_connector_auto_iam_authn import connect_with_connector_auto_iam_authn
 from connect_tcp import connect_tcp_socket
 from logger import get_logger
-
 from models import Base, UserModel
 
 logger = get_logger("db")
 
 load_dotenv()
 
-def init_connection_pool() -> tuple[sqlalchemy.engine.base.Engine, sessionmaker, Optional[Any]]:
+
+def init_connection_pool() -> (
+    tuple[sqlalchemy.engine.base.Engine, sessionmaker, Optional[Any]]
+):
     """
     Sets up connection pool for the app.
     Returns: (Engine, SessionMaker, Connector | None)
@@ -40,6 +43,7 @@ def init_connection_pool() -> tuple[sqlalchemy.engine.base.Engine, sessionmaker,
         "Missing database connection type. Please define one of DB_HOST, or INSTANCE_CONNECTION_NAME"
     )
 
+
 def init_db(engine) -> bool:
     """Test database connectivity before serving requests."""
     try:
@@ -52,8 +56,9 @@ def init_db(engine) -> bool:
         logger.info("Database connection succeful and tables ensured.")
         return True
     except OperationalError as e:
-        logger.error("Database connection failed: %s",e)
+        logger.error("Database connection failed: %s", e)
         return False
+
 
 def create_user(SessionLocal: sessionmaker, name: str, email: str):
     """Creatd a user if not exists, given name and email."""
@@ -82,12 +87,15 @@ def read_users(SessionLocal: sessionmaker):
     session = SessionLocal()
     try:
         users = session.query(UserModel).all()
-        return [{"id": user.id, "name": user.name, "email": user.email} for user in users]
+        return [
+            {"id": user.id, "name": user.name, "email": user.email} for user in users
+        ]
     except SQLAlchemyError as e:
         logger.error("Error in read_users: %s", e)
         return {"error": str(e)}
     finally:
         session.close()
+
 
 def read_user(SessionLocal: sessionmaker, user_id: int):
     """Reads a single user by their ID."""
@@ -105,7 +113,10 @@ def read_user(SessionLocal: sessionmaker, user_id: int):
     finally:
         session.close()
 
-def update_user(SessionLocal:sessionmaker, id: int, new_name: str = None, new_email: str = None):
+
+def update_user(
+    SessionLocal: sessionmaker, id: int, new_name: str = None, new_email: str = None
+):
     session = SessionLocal()
     try:
         user = session.query(UserModel).filter_by(id=id).first()
@@ -126,7 +137,8 @@ def update_user(SessionLocal:sessionmaker, id: int, new_name: str = None, new_em
     finally:
         session.close()
 
-def delete_user(SessionLocal:sessionmaker, id: int):
+
+def delete_user(SessionLocal: sessionmaker, id: int):
     session = SessionLocal()
     try:
         emp = session.query(UserModel).filter_by(id=id).first()
@@ -142,7 +154,6 @@ def delete_user(SessionLocal:sessionmaker, id: int):
         return {"error": str(e)}
     finally:
         session.close()
-
 
 
 # if __name__ == "__main__":
