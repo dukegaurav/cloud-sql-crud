@@ -176,5 +176,15 @@ def delete_user(SessionLocal: sessionmaker, id_to_delete: int):
         return {"error": str(err)}
 
 
-# if __name__ == "__main__":
-#     # ... (testing block remains the same)
+if __name__ == "__main__":
+    engine, session, connector = init_connection_pool()
+    try:
+        init_db(engine)
+        # create_user(session, "test", "test@abc.com")
+        # print(create_user(session, "test2", "test2@abc.com"))
+        # print(update_user(session, id=1,new_name="test1"))
+        print(read_users(session))
+        # print(read_user(session, id=1))
+    finally:
+        if connector:
+            connector.close()
